@@ -262,71 +262,23 @@ end
                 end
                 report.gof.bin_centers, report.gof.residuals_norm
             end
+        else
+            @series begin
+                seriestype := :line
+                label := ifelse(show_label, "Background", "")
+                subplot --> _subplot
+                margins --> (0, :mm)
+                bottom_margin --> (-4, :mm)
+                xlabel := "Energy (keV)"
+                xticks --> ([])
+                ylabel := "Counts / $(round(step(report.h.edges[1]), digits=2)) keV"
+                ylims := (ylim_min, ylim_max)
+                xlims := (minimum(report.h.edges[1]), maximum(report.h.edges[1]))
+                color := :black
+                minimum(report.h.edges[1]):f_fit_x_step:maximum(report.h.edges[1]), report.f_bck
+            end
         end
     end
-end
-
-@recipe function f(report::NamedTuple{(:v, :h, :f_fit, :f_sig, :f_lowEtail, :f_bck, :gof)}, mode::Symbol)
-    if mode == :cormat 
-        cm = cor(report.gof.covmat)
-    elseif  mode == :covmat
-        cm = report.gof.covmat
-    else
-        @debug "mode $mode not supported - has to be :cormat or :covmat"
-        return
-    end
-   
-    cm_plt  = NaN .* cm
-    for i in range(1, stop = size(cm)[1])
-        cm_plt[i:end,i] = cm[i:end,i]
-    end
-
-    # prepare labels 
-    par_names = fieldnames(report.v)
-    tick_names =  String.(collect(par_names))
-    tick_names[tick_names .== "step_amplitude"] .= L"\textrm{bkg}_\textrm{step}"
-    tick_names[tick_names .== "background"] .= "bkg"
-    tick_names[tick_names .== "skew_width"] .= L"\textrm{tail}_\textrm{skew}"
-    tick_names[tick_names .== "skew_fraction"] .= L"\textrm{tail}_\textrm{frac}"
-
-    @series begin
-        seriestype := :heatmap
-       # c := cgrad(:grays, rev = true)
-       c := :RdBu_3#:bam
-        cm_plt
-    end
-
-    # annotation for correlation coefficient 
-    cm_vec = round.(vec(cm_plt), digits = 2)
-    xvec  = vec(hcat([fill(i, 7) for i in 1:7]...))
-    yvec  = vec(hcat([fill(i, 7) for i in 1:7]...)')
-    xvec = xvec[isfinite.(cm_vec)]
-    yvec = yvec[isfinite.(cm_vec)]
-    cm_vec = cm_vec[isfinite.(cm_vec)]
-    @series begin
-        seriestype := :scatter
-        xticks := (1:length(par_names),tick_names)
-        yticks := (1:length(par_names),tick_names)
-        yflip --> true
-        markeralpha := 0
-        colorbar --> false 
-        label --> false
-        legend --> false
-        thickness_scaling := 1.0
-        xtickfontsize --> 12
-        xlabelfontsize --> 14
-        ylabelfontsize --> 14
-        tickfontsize --> 12
-        legendfontsize --> 10
-        xlims --> (0.5, length(par_names)+0.5)
-        ylims --> (0.5, length(par_names)+0.5)
-        size --> (600, 575)
-        grid --> false
-        title --> "Correlation Matrix" 
-        series_annotations := [("$(cm_vec[i])", :center, :center, :black, 12, "Helvetica Bold") for i in eachindex(xvec)]
-        xvec, yvec
-    end
-
 end
 
 @recipe function f(report::NamedTuple{((:v, :h, :f_fit, :f_sig, :f_bck))}; f_fit_x_step_scaling=1/100)
@@ -358,30 +310,6 @@ end
         label := "Background"
         color := :black
         minimum(report.h.edges[1]):f_fit_x_step:maximum(report.h.edges[1]), report.f_bck
-    end
-end
-
-@recipe function f(report::NamedTuple{(:survived, :cut, :sf, :bsf)}; cut_value = missing)
-    size --> (1200,400)
-    left_margin --> (10, :mm)
-    layout := @layout ([A{0.01h}; [B{0.75h}; C{0.175h}] [D{0.75h}; E{0.175h}]])
-    @series begin
-        title := (ismissing(cut_value) ? "" : "Cut value: $(cut_value)   ") * "Survival fraction: $(round(report.sf * 100, digits = 2))%"
-        grid := false
-        showaxis := false
-        label := nothing
-        bottom_margin := (-20, :px)
-        []
-    end
-    @series begin
-        title := "Survived\n\n"
-        _subplot := 2
-        report.survived
-    end
-    @series begin
-        title := "Cut\n\n"
-        _subplot := 4
-        report.cut
     end
 end
 
