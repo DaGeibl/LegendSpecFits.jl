@@ -49,10 +49,10 @@ function fit_aoe_corrections(e::Array{<:Unitful.Energy{<:Real}}, μ::Array{<:Rea
     @debug "Compton band σ normalization: $(result_σ.func)"
 
     # put everything together into A/E correction/normalization function 
-    aoe_str = "(a / ( ($e_expression)$e_unit^-1) )" # get aoe, but without unit. 
+    aoe_str = "(a / ( ($e_expression) $e_unit^-1) )" # get aoe, but without unit. 
     func_aoe_corr = "($aoe_str - ($(result_µ.func)) ) / ($(result_σ.func))"
     func_generic_aoe_corr = "(aoe - $(result_µ.func_generic)) / $(result_σ.func_generic)"
-    func_aoe_corr_ecal = replace(func_aoe_corr, string(e_expression) => "e_cal") # function that can be used for already calibrated energies 
+    func_aoe_corr_ecal = replace(func_aoe_corr, e_expression => "e_cal") # function that can be used for already calibrated energies 
 
     result = (µ_compton = result_µ, σ_compton = result_σ, compton_bands = (e = e,), func = func_aoe_corr, func_generic = func_generic_aoe_corr, func_ecal = func_aoe_corr_ecal)
     report = (report_µ = report_µ, report_σ = report_σ)
