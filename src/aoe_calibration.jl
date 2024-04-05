@@ -90,7 +90,7 @@ export prepare_dep_peakhist
 """
     get_n_after_aoe_cut(aoe_cut::T, aoe::Array{T}, e::Array{T}, peak::T, window::Array{T}, bin_width::T, result_before::NamedTuple, peakstats::NamedTuple; uncertainty=true) where T<:Real
 
-Get the number of counts after a AoE cut value `aoe_cut` for a given `peak` and `window` size while performing a peak fit with fixed position. The number of counts is determined by fitting the peak with a pseudo prior for the peak position.
+Get the number of counts after a AoE cut value `aoe_cut` for a given `peak` and `window` size whiile performing a peak fit with fixed position. The number of counts is determined by fitting the peak with a pseudo prior for the peak position.
 # Returns
 - `n`: Number of counts after the cut
 """
@@ -98,36 +98,12 @@ function get_n_after_aoe_cut(aoe_cut::Unitful.RealOrRealQuantity, aoe::Vector{<:
     # get energy after cut and create histogram
     peakhist = fit(Histogram, ustrip.(e[aoe .> aoe_cut]), ustrip(peak-first(window):bin_width:peak+last(window)))
     # create pseudo_prior with known peak sigma in signal for more stable fit
-    pseudo_prior = if fixed_position
-        NamedTupleDist(σ = Normal(result_before.σ, 0.1), μ = ConstValueDist(result_before.μ))
-    else
-        NamedTupleDist(σ = Normal(result_before.σ, 0.1), )
-    end
+    pseudo_prior = NamedTupleDist(σ = Normal(result_before.σ, 0.1), )
     # fit peak and return number of signal counts
     result, _ = fit_single_peak_th228(peakhist, peakstats,; uncertainty=uncertainty, low_e_tail=false, pseudo_prior=pseudo_prior)
     return result.n
 end
 export get_n_after_aoe_cut
-
-
-"""
-    get_sf_after_aoe_cut(aoe_cut::T, aoe::Array{T}, e::Array{T}, peak::T, window::Array{T}, bin_width::T, result_before::NamedTuple; uncertainty=true) where T<:Real
-
-Get the survival fraction after a AoE cut value `aoe_cut` for a given `peak` and `window` size from a combined fit to the survived and cut histograms.
-
-# Returns
-- `sf`: Survival fraction after the cut
-"""
-function get_sf_after_aoe_cut(aoe_cut::Unitful.RealOrRealQuantity, aoe::Vector{<:Unitful.RealOrRealQuantity}, e::Vector{<:T}, peak::T, window::Vector{T}, bin_width::T, result_before::NamedTuple; uncertainty::Bool=true) where T<:Unitful.Energy{<:Real}
-    # get energy after cut and create histogram
-    survived = fit(Histogram, ustrip.(e[aoe .>= aoe_cut]), ustrip(peak-first(window):bin_width:peak+last(window)))
-    cut = fit(Histogram, ustrip.(e[aoe .< aoe_cut]), ustrip(peak-first(window):bin_width:peak+last(window)))
-    # fit peak and return number of signal counts
-    result, _ = fit_subpeaks_th228(survived, cut, result_before; uncertainty=uncertainty, low_e_tail=false)
-    return result.sf
-end
-export get_sf_after_aoe_cut
-
 
 
 """
@@ -156,16 +132,18 @@ function get_aoe_cut(aoe::Vector{<:Unitful.RealOrRealQuantity}, e::Vector{<:T},;
     # get peakstats
     depstats = estimate_single_peak_stats(dephist)
     # fit before cut
-    result_before, _ = fit_single_peak_th228(dephist, depstats; uncertainty=uncertainty, fixed_position=fixed_position, low_e_tail=false)
+    result_before, _ = fit_single_peak_th228(dephist, depstats,; uncertainty=uncertainty, fixed_position=fixed_position, low_e_tail=false)
+    # get n0 before cut
+    nsf = result_before.n * dep_sf
     # get aoe cut
-    sf_dep_f = cut -> get_sf_after_aoe_cut(cut, aoe, e, dep, window, bin_width, mvalue(result_before); uncertainty=false) - dep_sf
-    aoe_cut = find_zero(sf_dep_f, cut_search_interval, Bisection(), rtol=rtol, maxiters=maxiters)
-    # get sf after cut
-    sf = get_sf_after_aoe_cut(aoe_cut, aoe, e, dep, window, bin_width, mvalue(result_before); uncertainty=uncertainty)
-    return (lowcut = measurement(aoe_cut, aoe_cut * rtol), highcut = sigma_high_sided, n0 = result_before.n, nsf = result_before.n * sf, sf = sf * 100*u"percent")
+    n_surrival_dep_f = cut -> get_n_after_aoe_cut(cut, aoe, e, dep, window, bin_width, mvalue(result_before), depstats; uncertainty=false, fixed_position=fixed_position) - nsf
+    aoe_cut = find_zero(n_surrival_dep_f, cut_search_interval, Bisection(), rtol=rtol, maxiters=maxiters)
+    # return n_surrival_dep_f.(0.25:0.001:0.5)
+    # get nsf after cut
+    nsf = get_n_after_aoe_cut(aoe_cut, aoe, e, dep, window, bin_width, mvalue(result_before), depstats; uncertainty=uncertainty, fixed_position=fixed_position)
+    return (lowcut = measurement(aoe_cut, aoe_cut * rtol), highcut = sigma_high_sided, n0 = result_before.n, nsf = nsf, sf = nsf / result_before.n * 100*u"percent")
 end
 export get_aoe_cut
-
 
 
 """
