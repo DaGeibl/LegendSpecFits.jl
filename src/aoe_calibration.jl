@@ -52,7 +52,7 @@ function fit_aoe_corrections(e::Array{<:Unitful.Energy{<:Real}}, μ::Array{<:Rea
     aoe_str = "(a / ( ($e_expression)$e_unit^-1) )" # get aoe, but without unit. 
     func_aoe_corr = "($aoe_str - ($(result_µ.func)) ) / ($(result_σ.func))"
     func_generic_aoe_corr = "(aoe - $(result_µ.func_generic)) / $(result_σ.func_generic)"
-    func_aoe_corr_ecal = replace(func_aoe_corr, e_expression => "e_cal") # function that can be used for already calibrated energies 
+    func_aoe_corr_ecal = replace(func_aoe_corr, string(e_expression) => "e_cal") # function that can be used for already calibrated energies 
 
     result = (µ_compton = result_µ, σ_compton = result_σ, compton_bands = (e = e,), func = func_aoe_corr, func_generic = func_generic_aoe_corr, func_ecal = func_aoe_corr_ecal)
     report = (report_µ = report_µ, report_σ = report_σ)
@@ -98,7 +98,11 @@ function get_n_after_aoe_cut(aoe_cut::Unitful.RealOrRealQuantity, aoe::Vector{<:
     # get energy after cut and create histogram
     peakhist = fit(Histogram, ustrip.(e[aoe .> aoe_cut]), ustrip(peak-first(window):bin_width:peak+last(window)))
     # create pseudo_prior with known peak sigma in signal for more stable fit
-    pseudo_prior = NamedTupleDist(σ = Normal(result_before.σ, 0.1), )
+    pseudo_prior = if fixed_position
+        NamedTupleDist(σ = Normal(result_before.σ, 0.1), μ = ConstValueDist(result_before.μ))
+    else
+        NamedTupleDist(σ = Normal(result_before.σ, 0.1), )
+    end
     # fit peak and return number of signal counts
     result, _ = fit_single_peak_th228(peakhist, peakstats,; uncertainty=uncertainty, low_e_tail=false, pseudo_prior=pseudo_prior)
     return result.n
@@ -188,8 +192,12 @@ function get_peak_surrival_fraction(aoe::Vector{<:Unitful.RealOrRealQuantity}, e
     # estimate bin width
     bin_width = get_friedman_diaconis_bin_width(e[e .> peak - bin_width_window .&& e .< peak + bin_width_window])
     # get energy after cut and create histogram
-    survived = fit(Histogram, ustrip(e_survived), ustrip(peak-first(window):bin_width:peak+last(window)))
-    cut      = fit(Histogram, ustrip(e_cut),      ustrip(peak-first(window):bin_width:peak+last(window)))
+    peakhist = fit(Histogram, ustrip(e), ustrip(peak-first(window):bin_width:peak+last(window)))
+    # create pseudo_prior with known peak sigma in signal for more stable fit
+    # pseudo_prior = NamedTupleDist(μ = ConstValueDist(result_before.μ), σ = Normal(result_before.σ, 0.1))
+    pseudo_prior = NamedTupleDist(σ = Normal(result_before.σ, 0.1), )
+    # estimate peak stats
+    peakstats = estimate_single_peak_stats(peakhist)
     # fit peak and return number of signal counts
     result_after, report_after = fit_subpeaks_th228(survived, cut, result_before; uncertainty=uncertainty, low_e_tail=low_e_tail)
     # calculate surrival fraction
