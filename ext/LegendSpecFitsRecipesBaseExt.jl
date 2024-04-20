@@ -3,7 +3,7 @@
 module LegendSpecFitsRecipesBaseExt
 
 using RecipesBase
-using Unitful, Format, Measurements
+using Unitful, Format, Measurements, LaTeXStrings
 using Measurements: value, uncertainty
 using StatsBase, LinearAlgebra
 
