@@ -3,7 +3,7 @@
 module LegendSpecFitsRecipesBaseExt
 
 using RecipesBase
-using Unitful, Format, Measurements
+using Unitful, Format, Measurements, LaTeXStrings
 using Measurements: value, uncertainty
 using StatsBase, LinearAlgebra
 
@@ -17,14 +17,11 @@ end
 
 @recipe function f(report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)})
     ylabel := "Normalized Counts"
-    margins := (4, :mm)
+    legend := :bottomright
     framestyle := :box
-    legend := :bottomleft
-    xlims := (ustrip(Measurements.value(report.μ - 5*report.σ)), ustrip(Measurements.value(report.μ + 5*report.σ)))
     @series begin
         label := "Data"
-        subplot --> 1
-        report.h
+        ustrip.(x[x .> cuts.low .&& x .< cuts.high])
     end
     @series begin
         color := :red
