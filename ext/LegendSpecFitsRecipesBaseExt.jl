@@ -262,21 +262,6 @@ end
                 end
                 report.gof.bin_centers, report.gof.residuals_norm
             end
-        else
-            @series begin
-                seriestype := :line
-                label := ifelse(show_label, "Background", "")
-                subplot --> _subplot
-                margins --> (0, :mm)
-                bottom_margin --> (-4, :mm)
-                xlabel := "Energy (keV)"
-                xticks --> ([])
-                ylabel := "Counts / $(round(step(report.h.edges[1]), digits=2)) keV"
-                ylims := (ylim_min, ylim_max)
-                xlims := (minimum(report.h.edges[1]), maximum(report.h.edges[1]))
-                color := :black
-                minimum(report.h.edges[1]):f_fit_x_step:maximum(report.h.edges[1]), report.f_bck
-            end
         end
     end
 end
