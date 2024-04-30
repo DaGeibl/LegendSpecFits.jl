@@ -67,11 +67,11 @@ end
 
 
 """ 
-    get_mc_value_shapes(v::NamedTuple, v_err::NamedTuple, n::Integer)
+    get_mc_value_shapes(v::NamedTuple, v_err::NamedTuple, n::Union{Integer,Int32})
 Return a `NamedTuple` with the same fields as `v` and `v_err` but with
 `Normal` distributions for each field.
 """
-function get_mc_value_shapes(v::NamedTuple, v_err::NamedTuple, n::Integer)
+function get_mc_value_shapes(v::NamedTuple, v_err::NamedTuple, n::Union{Integer,Int32})
     vs = BAT.distprod(map(Normal, v, v_err))
     NamedTuple.(rand(vs, n))
 end
