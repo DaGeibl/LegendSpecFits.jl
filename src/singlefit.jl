@@ -59,45 +59,18 @@ function fit_single_trunc_gauss(x::Vector{<:Unitful.RealOrRealQuantity}, cuts::N
         # Calculate the parameter covariance matrix
         param_covariance = inv(H)
 
-        param_covariance = nothing
-        if !all(isfinite.(H))
-            @warn "Hessian matrix is not finite"
-            param_covariance = zeros(length(v_ml), length(v_ml))
-        else
-            # Calculate the parameter covariance matrix
-            param_covariance = inv(H)
-        end
-        if ~isposdef(param_covariance)
-            param_covariance = nearestSPD(param_covariance)
-        end
-        # Extract the parameter uncertainties
-        v_ml_err = array_to_tuple(sqrt.(abs.(diag(param_covariance))), v_ml)
-        
-        # TODO: p-values etc for unbinned fits
-        # get p-value
-        pval, chi2, dof = p_value(f_fit_n, h, v_ml)
-        
-        # calculate normalized residuals
-        residuals, residuals_norm, _, bin_centers = get_residuals(f_fit_n, h, v_ml)
+    # Extract the parameter uncertainties
+    μ_uncertainty = sqrt(abs(param_covariance[1, 1]))
+    σ_uncertainty = sqrt(abs(param_covariance[2, 2]))
 
-        @debug "Best Fit values"
-        @debug "μ: $(v_ml.μ) ± $(v_ml_err.μ)"
-        @debug "σ: $(v_ml.σ) ± $(v_ml_err.σ)"
+    @debug "μ: $μ ± $μ_uncertainty"
+    @debug "σ: $σ ± $σ_uncertainty"
 
-        result = merge(NamedTuple{keys(v_ml)}([measurement(v_ml[k], v_ml_err[k]) * x_unit for k in keys(v_ml)]...),
-                  (gof = (pvalue = pval, chi2 = chi2, dof = dof, covmat = param_covariance, 
-                  residuals = residuals, residuals_norm = residuals_norm, bin_centers = bin_centers),))
-    else
-        @debug "Best Fit values"
-        @debug "μ: $(v_ml.μ)"
-        @debug "σ: $(v_ml.σ)"
-
-        result = merge(v_ml, )
-    end
-
-    # normalize nocut histogram to PDF of cut histogram
-    h_pdf = Histogram(h_nocut.edges[1], h_nocut.weights ./ sum(h.weights) ./ step(h.edges[1]))
-
+    result = (
+        μ = measurement(μ, μ_uncertainty) * x_unit,
+        σ = measurement(σ, σ_uncertainty) * x_unit,
+        n = length(x)
+    )
     report = (
         f_fit = t -> Base.Fix2(f_fit, v_ml)(t),
         h = h_pdf,
