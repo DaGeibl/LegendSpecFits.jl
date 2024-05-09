@@ -263,7 +263,7 @@ function get_peak_surrival_fraction(aoe::Vector{<:Unitful.RealOrRealQuantity}, e
         before = report_before,
         after = report_after,
     )
-    return result, report_after
+    return result, report
 end
 export get_peak_surrival_fraction
 
