@@ -33,8 +33,9 @@ function fit_single_trunc_gauss(x::Vector{<:Unitful.RealOrRealQuantity}, cuts::N
     
     # create pseudo priors
     pseudo_prior = NamedTupleDist(
-        μ = Normal(ps.peak_pos, ps.peak_sigma/4),
-        σ = weibull_from_mx(ps.peak_sigma, 1.5*ps.peak_sigma),
+        μ = Uniform(ps.peak_pos-20, ps.peak_pos+20),
+        σ = weibull_from_mx(ps.peak_sigma, 3*ps.peak_sigma),
+        n = weibull_from_mx(ps.peak_counts, 3*ps.peak_counts)
     )
 
     # create fit model
@@ -114,7 +115,8 @@ function fit_half_centered_trunc_gauss(x::Vector{<:Unitful.RealOrRealQuantity}, 
     # create pseudo priors
     pseudo_prior = NamedTupleDist(
         μ = ConstValueDist(μ),
-        σ = weibull_from_mx(ps.peak_sigma, 1.5*ps.peak_sigma)
+        σ = weibull_from_mx(ps.peak_sigma, 3*ps.peak_sigma),
+        n = weibull_from_mx(ps.peak_counts, 3*ps.peak_counts)
     )
 
     # create fit model
@@ -222,8 +224,9 @@ function fit_half_trunc_gauss(x::Vector{<:Unitful.RealOrRealQuantity}, cuts::Nam
     
     # create pseudo priors
     pseudo_prior = NamedTupleDist(
-        μ = Normal(ps.peak_pos, ps.peak_sigma/4),
-        σ = weibull_from_mx(ps.peak_sigma, 1.5*ps.peak_sigma)
+        μ = Uniform(ps.peak_pos-2*ps.peak_sigma, ps.peak_pos+2*ps.peak_sigma),
+        σ = weibull_from_mx(ps.peak_sigma, 3*ps.peak_sigma),
+        n = weibull_from_mx(ps.peak_counts, 3*ps.peak_counts)
     )
 
     # create fit model
