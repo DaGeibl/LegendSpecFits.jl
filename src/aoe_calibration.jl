@@ -237,6 +237,8 @@ function get_peak_surrival_fraction(aoe::Vector{<:Unitful.RealOrRealQuantity}, e
         e_survived = e[aoe_cut .>= aoe]
         e_cut = e[aoe_cut .< aoe]
     end
+    e_survived = e[aoe_cut .<= aoe]
+    e_cut = e[aoe_cut .> aoe]
     
     # estimate bin width
     bin_width = get_friedman_diaconis_bin_width(e[e .> peak - bin_width_window .&& e .< peak + bin_width_window])
