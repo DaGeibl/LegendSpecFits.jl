@@ -17,11 +17,14 @@ end
 
 @recipe function f(report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)})
     ylabel := "Normalized Counts"
-    legend := :bottomright
+    margins := (4, :mm)
     framestyle := :box
+    legend := :bottomleft
+    xlims := (ustrip(Measurements.value(report.μ - 5*report.σ)), ustrip(Measurements.value(report.μ + 5*report.σ)))
     @series begin
         label := "Data"
-        ustrip.(x[x .> cuts.low .&& x .< cuts.high])
+        subplot --> 1
+        report.h
     end
     @series begin
         color := :red
