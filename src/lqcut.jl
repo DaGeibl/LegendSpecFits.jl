@@ -1,12 +1,13 @@
 """
-    lq_drift_time_correction(lq_norm::Vector{Float64}, tdrift, e_cal; DEP_left=1589u"keV", det_icpc = false, DEP_right=1596u"keV", lower_exclusion=0.005, upper_exclusion=0.98, drift_cutoff_sgima=2.0)
+    lq_drift_time_correction(lq_norm::Vector{Float64}, tdrift, e_cal; DEP_left=1589u"keV", det_icpc = false, DEP_right=1596u"keV", lower_exclusion=0.005, upper_exclusion=0.98, drift_cutoff_sigma=2.0)
 
 Perform the drift time correction on the LQ data using the DEP peak. The function cuts outliers in lq and drift time, then performs a linear fit on the remaining data. The data is Corrected by subtracting the linear fit from the lq data.
 # Returns
     * `result`: NamedTuple of the corrected lq data, the box used for the linear fit and the drift time function
     * `report`: NamedTuple of the histograms used for the fit
 """
-function lq_drift_time_correction(lq_norm::Vector{Float64}, tdrift, e_cal::Array{<:Unitful.Energy{<:Real}}, detectortype; DEP_left=1589u"keV", DEP_right=1596u"keV", lower_exclusion=0.005, upper_exclusion=0.98, drift_cutoff_sgima=2.0)
+function lq_drift_time_correction(
+    lq_norm::Vector{Float64}, tdrift::Vector{<:Unitful.RealOrRealQuantity}, e_cal::Array{<:Unitful.Energy{<:Real}}; mode::Symbol = :gaussian, DEP_left::Unitful.Energy = 1589u"keV", DEP_right::Unitful.Energy = 1596u"keV", lower_exclusion::Float64 = 0.005, upper_exclusion::Float64 = 0.98, drift_cutoff_sigma::Float64 = 2.0)
 
     #Using fixed values for DEP, can be changed to use values from DEP fit from Energy calibration 
     lq_DEP_dt = lq_norm[DEP_left .< e_cal .< DEP_right]
@@ -28,11 +29,11 @@ function lq_drift_time_correction(lq_norm::Vector{Float64}, tdrift, e_cal::Array
     σ_lq = mvalue(lq_result.σ)
 
     #set cutoff in lq dimension for later fit
-    lq_lower = µ_lq - drift_cutoff_sgima * σ_lq 
-    lq_upper = µ_lq + drift_cutoff_sgima * σ_lq 
+    lq_lower = µ_lq - drift_cutoff_sigma * σ_lq 
+    lq_upper = µ_lq + drift_cutoff_sigma * σ_lq 
 
     #t_tcal cutoff; method dependant on detector type
-    if detectortype in [:ppc, :bege, :coax] 
+    if mode == :gaussian 
         drift_prehist = fit(Histogram, t_tcal, range(minimum(t_tcal), stop=maximum(t_tcal), length=100))
         drift_prestats = estimate_single_peak_stats(drift_prehist)
         drift_start = drift_prestats.peak_pos - 3*drift_prestats.peak_sigma
@@ -41,14 +42,14 @@ function lq_drift_time_correction(lq_norm::Vector{Float64}, tdrift, e_cal::Array
         drift_edges = range(drift_start, stop=drift_stop, length=71)
         drift_hist_DEP = fit(Histogram, t_tcal, drift_edges)
         
-        drift_result, drift_report = LegendSpecFits.fit_binned_gauss(drift_hist_DEP)
+        drift_result, drift_report = LegendSpecFits.fit_binned_trunc_gauss(drift_hist_DEP)
         µ_t = mvalue(drift_result.μ)
         σ_t = mvalue(drift_result.σ)
 
         #set cutoff in drift time dimension for later fit
-        t_lower = µ_t - drift_cutoff_sgima * σ_t
-        t_upper = µ_t + drift_cutoff_sgima * σ_t
-    elseif detectortype == :icpc
+        t_lower = µ_t - drift_cutoff_sigma * σ_t
+        t_upper = µ_t + drift_cutoff_sigma * σ_t
+    elseif mode == :double_gaussian
         #create histogram for drift time
         drift_prehist = fit(Histogram, t_tcal, range(minimum(t_tcal), stop=maximum(t_tcal), length=100))
         drift_prestats = estimate_single_peak_stats(drift_prehist)
@@ -67,7 +68,7 @@ function lq_drift_time_correction(lq_norm::Vector{Float64}, tdrift, e_cal::Array
         t_lower = minimum(x_at_threshold)
         t_upper = maximum(x_at_threshold)
     else
-        error("Detector type $detectortype not supported")
+        error("Mode $mode not supported")
     end
 
     #store cutoff values in box to return later    
@@ -78,9 +79,18 @@ function lq_drift_time_correction(lq_norm::Vector{Float64}, tdrift, e_cal::Array
     t_cut = t_tcal[lq_lower .< lq_DEP_dt .< lq_upper .&& t_lower .< t_tcal .< t_upper]
 
     #linear fit
+    #=
     result_µ, report_µ = chi2fit(1, t_cut, lq_cut; uncertainty=true)
     parameters = mvalue(result_µ.par)
     drift_time_func(x) = parameters[2] .* x .+ parameters[1] 
+    =#
+
+    #alternative linear fit due to chi2fit error
+    linear_model(x, p) = p[1] .+ p[2] .* x
+    initial_params = [0.0, 1.0]  
+    fit_result = curve_fit(linear_model, t_cut, lq_cut, initial_params)
+    parameters = coef(fit_result)
+    drift_time_func(x) = parameters[1] .+ parameters[2] .* x
 
     #correct lq data with the linear fit to get lq classifier
     lq_classifier = lq_norm .- drift_time_func(ustrip.(tdrift))
@@ -112,7 +122,9 @@ Evaluates the cutoff value for the LQ cut. The function performs a binned gaussi
     * `result`: NamedTuple of the cutoff value and the fit result
     * `report`: NamedTuple of the histograms used for the fit
 """
-function LQ_cut(DEP_µ, DEP_σ, e_cal, lq_classifier; lower_exclusion=0.005, upper_exclusion=0.95, cut_sigma=3.0)
+function LQ_cut(
+    DEP_µ::Unitful.Energy, DEP_σ::Unitful.Energy, e_cal::Vector{<:Unitful.Energy}, lq_classifier::Vector{Float64}; lower_exclusion::Float64=0.005, upper_exclusion::Float64=0.95, cut_sigma::Float64=3.0)
+
     # Define sidebands
     lq_DEP = lq_classifier[DEP_µ - 4.5 * DEP_σ .< e_cal .< DEP_µ + 4.5 * DEP_σ]
     lq_sb1 = lq_classifier[DEP_µ -  2 * 4.5 * DEP_σ .< e_cal .< DEP_µ - 4.5 * DEP_σ]
