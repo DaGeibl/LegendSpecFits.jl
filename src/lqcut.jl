@@ -79,18 +79,9 @@ function lq_drift_time_correction(
     t_cut = t_tcal[lq_lower .< lq_DEP_dt .< lq_upper .&& t_lower .< t_tcal .< t_upper]
 
     #linear fit
-    #=
     result_µ, report_µ = chi2fit(1, t_cut, lq_cut; uncertainty=true)
     parameters = mvalue(result_µ.par)
     drift_time_func(x) = parameters[2] .* x .+ parameters[1] 
-    =#
-
-    #alternative linear fit due to chi2fit error
-    linear_model(x, p) = p[1] .+ p[2] .* x
-    initial_params = [0.0, 1.0]  
-    fit_result = curve_fit(linear_model, t_cut, lq_cut, initial_params)
-    parameters = coef(fit_result)
-    drift_time_func(x) = parameters[1] .+ parameters[2] .* x
 
     #correct lq data with the linear fit to get lq classifier
     lq_classifier = lq_norm .- drift_time_func(ustrip.(tdrift))
