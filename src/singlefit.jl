@@ -252,7 +252,7 @@ function fit_half_trunc_gauss(x::Vector{<:Unitful.RealOrRealQuantity}, cuts::Nam
     x, cut_low, cut_high, cut_max = ustrip.(x), ustrip(cuts.low), ustrip(cuts.high), ustrip(cuts.max)
 
     # get peak stats
-    bin_width = get_friedman_diaconis_bin_width(x[(x .> cut_low) .&& (x .< cut_high)])
+    bin_width = get_friedman_diaconis_bin_width(x[cut_low .< x .< cut_high])
     x_min, x_max = minimum(x), maximum(x)
     x_nocut = copy(x)
     h_nocut = fit(Histogram, x, x_min:bin_width:x_max)
@@ -261,7 +261,8 @@ function fit_half_trunc_gauss(x::Vector{<:Unitful.RealOrRealQuantity}, cuts::Nam
 
     # cut peak out of data
     x = x[(x .> ifelse(left, cut_low, cut_max)) .&& (x .< ifelse(left, cut_max, cut_high))]
-    h = fit(Histogram, x, ifelse(left, cut_low, cut_max):bin_width:ifelse(left, cut_max, cut_high))
+    new_bin_width = get_friedman_diaconis_bin_width(x)
+    h = fit(Histogram, x, ifelse(left, cut_low, cut_max):new_bin_width:ifelse(left, cut_max, cut_high))
     n = length(x)
 
     # create fit functions
@@ -347,6 +348,10 @@ function fit_half_trunc_gauss(x::Vector{<:Unitful.RealOrRealQuantity}, cuts::Nam
     report = (
         f_fit = t -> Base.Fix2(f_fit, v_ml)(t),
         h = h_pdf,
+        h_nocut = h_nocut,
+        h_temp = h,
+        bin_width = bin_width,
+        new_bin_width = new_bin_width,
         μ = result.μ,
         σ = result.σ,
         gof = get(result, :gof, NamedTuple())

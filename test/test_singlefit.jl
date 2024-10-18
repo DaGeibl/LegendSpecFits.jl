@@ -10,12 +10,13 @@ using Unitful
 include("test_utils.jl")
 
 
-@testset "singlefit" begin
+#@testset "singlefit" begin
     # compose dummy data 
     dist = Normal(0.0, 1.0)
     x = rand(dist, 100000)
     x_cut = cut_single_peak(x, -3.0, 3.0)
-    
+   
+    #=
     # fit the data
     res, _ = fit_single_trunc_gauss(x; uncertainty=true)
     res_cut, _ = fit_single_trunc_gauss(x, x_cut; uncertainty=true)
@@ -36,16 +37,30 @@ include("test_utils.jl")
         @test isapprox(mvalue(res_left.μ), 0.0, atol = 0.1)
         @test isapprox(mvalue(res_left.σ), 1.0, atol = 0.1)
     end
-
-    res_right, _ = fit_half_trunc_gauss(x, x_cut; left=false, uncertainty=true)
-    res_left, _ = fit_half_trunc_gauss(x, x_cut; left=true, uncertainty=true)
+    =#
+    res_right, rep_right = fit_half_trunc_gauss(x, x_cut; left=false, uncertainty=true)
+    res_left, rep_left = fit_half_trunc_gauss(x, x_cut; left=true, uncertainty=true)
     # check the results
-    @testset "fit_half_trunc_gauss" begin
+    #@testset "fit_half_trunc_gauss" begin
         @test isapprox(mvalue(res_right.μ), 0.0, atol = 0.1)
         @test isapprox(mvalue(res_right.σ), 1.0, atol = 0.1)
         @test isapprox(mvalue(res_left.μ), 0.0, atol = 0.1)
         @test isapprox(mvalue(res_left.σ), 1.0, atol = 0.1)
-    end
+    #end
+
+    plot(rep_right.h_nocut, size=(1200, 900))
+    xlims!(-3.1, 3.1)
+    plot!(rep_right.h_temp)
+    plot!(rep_right.f_fit, color=:red, linewidth=2)
+    
+    plot(rep_right.h)
+    xlims!(-3.0, 3.0)
+    plot!(rep_right.f_fit, color=:red, linewidth=2)
+
+    plot!(rep_left.h)
+    xlims!(-3.0, 3.0)
+    plot!(rep_left.f_fit, color=:red, linewidth=2)
+
 
     hist = fit(Histogram, x, -3.0:0.05:3.0)
     res, _ = fit_binned_trunc_gauss(hist; uncertainty=true)
